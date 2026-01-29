@@ -1,52 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>CLONBIO – Industrial AR Viewer</title>
 
-  <!-- Google Model Viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
-    /* Reset e estilo geral */
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background-color: #f4f4f4;
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f4f4f4; }
+    header { background:#c62828; color:#fff; padding:16px; font-size:20px; font-weight:700; }
+    main { max-width:1100px; margin:20px auto; background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,.12); }
+
+    .info { margin:0 0 12px; background:#eee; padding:12px; border-radius:10px; font-size:14px; line-height:1.4; }
+    .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin: 10px 0 12px; }
+    button { border:0; border-radius:10px; padding:10px 12px; background:#c62828; color:#fff; font-weight:700; cursor:pointer; }
+    button.secondary { background:#333; }
+
+    .wrap { position:relative; }
+
+    model-viewer{
+      width:100%;
+      height:600px;
+      background:#111;
+      border-radius:12px;
+
+      /* Better touch gestures */
+      touch-action:none;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    header {
-      background-color: #c62828;
-      color: #fff;
-      padding: 16px;
-      font-size: 20px;
-      font-weight: bold;
-      text-align: left;
+    /* Poster / loading */
+    .poster{
+      display:flex; align-items:center; justify-content:center;
+      width:100%; height:100%;
+      color:#fff; font-weight:700;
+      background: linear-gradient(180deg, rgba(0,0,0,.7), rgba(0,0,0,.9));
     }
 
-    main {
-      max-width: 1100px;
-      margin: 20px auto;
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+    /* Error overlay */
+    .errorBox{
+      margin-top:10px;
+      font-size:12px;
+      background:#fff3f3;
+      border:1px solid #ffd1d1;
+      color:#7a0000;
+      padding:10px 12px;
+      border-radius:10px;
+      white-space:pre-wrap;
+      display:none;
     }
-
-    model-viewer {
-      width: 100%;
-      height: 600px;
-      background-color: #111;
-      border-radius: 12px;
-    }
-
-    .info {
-      margin-top: 15px;
-      background-color: #eee;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-    }
+    code{ background:#eee; padding:1px 6px; border-radius:6px; }
   </style>
 </head>
 
@@ -55,23 +61,101 @@
 
   <main>
     <p class="info">
-      ✔ Abra este link no celular<br>
-      ✔ Toque no botão <strong>AR</strong><br>
-      ✔ Mova o celular para escanear o chão<br>
-      ✔ O modelo aparecerá em escala real no ambiente
+      ✔ Tap <b>AR</b><br>
+      ✔ Gestures: <b>drag</b> (move), <b>pinch</b> (scale), <b>two fingers</b> (rotate)
     </p>
 
-    <!-- Use ?v=3, ?v=4, etc. ao atualizar -->
-    <model-viewer
-      src="BBC_Outside_Platform_4.glb"
-      ar
-      ar-modes="webxr scene-viewer quick-look"
-      ar-scale="auto"
-      camera-controls
-      auto-rotate
-      environment-image="neutral"
-      exposure="1.0">
-    </model-viewer>
+    <div class="bar">
+      <button id="reloadBtn" class="secondary">Reload (cache bust)</button>
+      <button id="frameBtn">Reframe</button>
+    </div>
+
+    <div class="wrap">
+      <model-viewer
+        id="viewer"
+
+        <!-- CHANGE ONLY THIS (and include ./ if in same folder) -->
+        src="./BBC_Outside_Platform_4.glb"
+
+        ar
+        ar-modes="webxr scene-viewer quick-look"
+        ar-placement="floor"
+        ar-scale="auto"
+
+        camera-controls
+        interaction-prompt="auto"
+
+        environment-image="neutral"
+        exposure="1.0"
+        shadow-intensity="0.8"
+
+        bounds="tight"
+        loading="eager"
+        reveal="auto"
+
+        /* Helps ensure the model is visible even if huge */
+        camera-orbit="0deg 75deg 2.5m"
+        min-camera-orbit="auto auto 0.5m"
+        max-camera-orbit="auto auto 20m"
+      >
+        <div class="poster" slot="poster">Loading model…</div>
+      </model-viewer>
+    </div>
+
+    <div id="errorBox" class="errorBox"></div>
   </main>
+
+  <script>
+    const viewer = document.getElementById('viewer');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const frameBtn = document.getElementById('frameBtn');
+    const errorBox = document.getElementById('errorBox');
+
+    // Only prevent browser interference INSIDE the viewer (do not block the whole page)
+    viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive:false });
+
+    function showError(msg){
+      errorBox.style.display = 'block';
+      errorBox.textContent = msg;
+    }
+    function clearError(){
+      errorBox.style.display = 'none';
+      errorBox.textContent = '';
+    }
+
+    reloadBtn.addEventListener('click', () => {
+      clearError();
+      const base = viewer.src.split('?')[0];
+      viewer.src = `${base}?v=${Date.now()}`;
+    });
+
+    frameBtn.addEventListener('click', async () => {
+      // zoom to model bounds (if supported)
+      try{
+        if (viewer.updateFraming) viewer.updateFraming();
+      }catch(e){}
+    });
+
+    viewer.addEventListener('load', () => {
+      clearError();
+      // Try to reframe automatically after load
+      try{ if (viewer.updateFraming) viewer.updateFraming(); }catch(e){}
+    });
+
+    viewer.addEventListener('error', () => {
+      showError(
+`❌ Failed to load the GLB.
+
+Most common causes on GitHub Pages:
+1) Wrong path or filename (case-sensitive). Example: Model.glb ≠ model.glb
+2) The file is inside a folder (use src="./folder/Model.glb")
+3) Git LFS pointer file (opens as text with "git-lfs" line) — model-viewer cannot load it.
+
+Test:
+Open the GLB directly in the browser:
+https://YOURUSER.github.io/YOURREPO/YourModel.glb`
+      );
+    });
+  </script>
 </body>
 </html>
