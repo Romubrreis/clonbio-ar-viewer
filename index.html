@@ -53,7 +53,6 @@
     .crosshair::before{ width:10px; height:2px; }
     .crosshair::after{ width:2px; height:10px; }
 
-    /* Controls */
     .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0 0; }
     button {
       border:none; border-radius:10px; padding:10px 12px;
@@ -114,7 +113,7 @@
       ✔ Tap <strong>AR</strong><br>
       ✔ Gestures: <strong>drag</strong> (move), <strong>pinch</strong> (scale), <strong>two fingers</strong> (rotate)<br>
       ✔ Use <strong>Compact Start</strong> to place faster, then switch to <strong>Real Scale (1:1)</strong><br>
-      ✔ Turn <strong>Base</strong> ON for faster alignment (visual footprint)
+      ✔ In <strong>Real Scale</strong>, AR scale is locked (no pinch scaling)
     </p>
 
     <div class="controls">
@@ -127,7 +126,6 @@
       <div class="crosshair"></div>
       <div class="footprint" id="footprint"></div>
 
-      <!-- Photo button overlay (only appears during in-browser AR / WebXR) -->
       <button class="photo-btn" id="photoBtn">PHOTO</button>
 
       <model-viewer
@@ -148,7 +146,7 @@
     </div>
 
     <div class="status" id="status">
-      Tip: Use Base ON + Compact Start to align quickly, then switch to Real Scale.
+      Tip: Use Base ON + Compact Start to align quickly, then switch to Real Scale to lock scale in AR.
     </div>
   </main>
 
@@ -167,12 +165,10 @@
     viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
     // --- Compact scale logic (universal) ---
-    // Smaller target => starts smaller in AR.
-    const TARGET_MAX_DIM_METERS = 0.8; // make 0.7 or 0.5 if you want even smaller start
+    const TARGET_MAX_DIM_METERS = 0.8; // make 0.7 or 0.5 for even smaller start
     const COMPACT_MIN = 0.03;
     const COMPACT_MAX = 1.0;
 
-    // Fallback compact start scale (if we can't read model dimensions)
     const FALLBACK_COMPACT = 0.15;
 
     let compactOn = true;
@@ -184,7 +180,6 @@
     function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
     function updateFootprint(scale) {
-      // visual helper only; scales with current model scale
       const size = 160 * scale;
       footprint.style.width = `${size}px`;
       footprint.style.height = `${size}px`;
@@ -204,6 +199,12 @@
       updateFootprint(s);
     }
 
+    // NEW: control AR pinch scaling behavior
+    function setArScaleMode(mode) {
+      // mode: "auto" (allow scaling) | "fixed" (lock scaling)
+      viewer.setAttribute('ar-scale', mode);
+    }
+
     function applyCompactNow() {
       setScaleUniform(compactScale);
     }
@@ -211,15 +212,21 @@
     function setCompact(on) {
       compactOn = on;
       if (on) {
+        // In compact mode, allow scaling if needed
+        setArScaleMode('auto');
+
         applyCompactNow();
         compactBtn.textContent = 'Compact Start: ON';
         compactBtn.classList.add('secondary');
-        statusEl.innerHTML = `Compact start ON — initial scale: <b>${compactScale.toFixed(3)}x</b>. Pinch to scale up.`;
+        statusEl.innerHTML = `Compact start ON — initial scale: <b>${compactScale.toFixed(3)}x</b>. Pinch can scale (AR Scale: AUTO).`;
       } else {
+        // In real scale, lock AR scaling
+        setArScaleMode('fixed');
+
         setScaleUniform(1.0);
         compactBtn.textContent = 'Compact Start: OFF';
         compactBtn.classList.remove('secondary');
-        statusEl.innerHTML = 'Real scale (1:1). Pinch to fine-tune.';
+        statusEl.innerHTML = 'Real scale (1:1). AR Scale LOCKED (no pinch scaling).';
       }
     }
 
@@ -257,20 +264,30 @@
       }
     });
 
-    // Show photo button only while presenting in-browser AR (WebXR).
-    // Also: force compact scale and enable base on AR start.
+    // AR status: force correct AR scaling mode when AR starts
     viewer.addEventListener('ar-status', (e) => {
       const s = e.detail.status; // not-presenting | session-started | object-placed | failed
 
       if (s === 'session-started') {
-        if (compactOn) applyCompactNow();  // start smaller in camera mode
-        setBase(true); // base ON helps alignment
-        statusEl.textContent = 'AR started. Use Base ON + Compact Start to align quickly. Pinch to scale up.';
+        // Keep base ON to speed alignment
+        setBase(true);
+
+        // IMPORTANT: enforce AR scale mode based on current state
+        if (compactOn) {
+          setArScaleMode('auto');     // allow scaling in compact mode
+          applyCompactNow();          // start smaller
+          statusEl.textContent = 'AR started. Compact mode ON (AR scaling allowed). Pinch to scale if needed.';
+        } else {
+          setArScaleMode('fixed');    // lock scaling in 1:1
+          setScaleUniform(1.0);
+          statusEl.textContent = 'AR started. Real Scale (1:1) with AR scaling LOCKED.';
+        }
+
         photoBtn.style.display = 'block';
       }
 
       if (s === 'object-placed') {
-        statusEl.textContent = 'Placed! Drag=move, pinch=scale, two fingers=rotate.';
+        statusEl.textContent = 'Placed! Drag=move, two fingers=rotate. (Scaling depends on mode: AUTO/FIXED)';
       }
 
       if (s === 'failed') {
@@ -284,7 +301,6 @@
     });
 
     // ===== PHOTO (best-effort inside WebXR) =====
-    // Note: Depending on device/browser, this may capture only the model render (not the camera background).
     function downloadBlob(blob, filename) {
       const a = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -307,8 +323,9 @@
       }
     });
 
-    // Init: start with compact ON + base ON
+    // Init: start with compact ON + base ON + AR scale AUTO
     setBase(true);
+    setArScaleMode('auto');
     setCompact(true);
   </script>
 </body>
