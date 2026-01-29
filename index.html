@@ -5,118 +5,70 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CLONBIO – Industrial AR Viewer</title>
 
-  <!-- Google Model Viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
-    /* Reset and general style */
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background-color: #f4f4f4;
-    }
-
-    header {
-      background-color: #c62828;
-      color: #fff;
-      padding: 16px;
-      font-size: 20px;
-      font-weight: bold;
-      text-align: left;
-    }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background-color:#f4f4f4; }
+    header { background-color:#c62828; color:#fff; padding:16px; font-size:20px; font-weight:bold; text-align:left; }
 
     main {
-      max-width: 1100px;
-      margin: 20px auto;
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+      max-width:1100px; margin:20px auto; background-color:#fff; padding:20px;
+      border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,0.12);
     }
 
     .info {
-      margin-top: 15px;
-      background-color: #eee;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      line-height: 1.4;
+      margin-top:15px; background-color:#eee; padding:12px;
+      border-radius:8px; font-size:14px; line-height:1.4;
     }
 
-    /* Viewer wrapper so we can place UI over it */
-    .viewer-wrap {
-      position: relative;
-    }
+    .viewer-wrap { position:relative; }
 
     model-viewer {
-      width: 100%;
-      height: 600px;
-      background-color: #111;
-      border-radius: 12px;
+      width:100%;
+      height:600px;
+      background-color:#111;
+      border-radius:12px;
 
-      /* KEY: improves pinch/drag gestures (prevents browser stealing gestures) */
-      touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
+      touch-action:none;
+      -webkit-user-select:none;
+      user-select:none;
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* Simple crosshair to help aiming/positioning */
     .crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%,-50%);
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255,255,255,.75);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 3;
-      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:18px; height:18px;
+      border:2px solid rgba(255,255,255,.75);
+      border-radius:50%;
+      pointer-events:none;
+      z-index:3;
+      box-shadow:0 0 0 2px rgba(0,0,0,.25);
     }
-    .crosshair::before, .crosshair::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%,-50%);
+    .crosshair::before,.crosshair::after{
+      content:""; position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
       background: rgba(255,255,255,.75);
     }
-    .crosshair::before { width: 10px; height: 2px; }
-    .crosshair::after { width: 2px; height: 10px; }
+    .crosshair::before{ width:10px; height:2px; }
+    .crosshair::after{ width:2px; height:10px; }
 
-    /* Small control bar */
-    .controls {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin: 12px 0 0;
-    }
-
+    .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0 0; }
     button {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 12px;
-      background: #c62828;
-      color: #fff;
-      font-weight: bold;
-      cursor: pointer;
+      border:none; border-radius:10px; padding:10px 12px;
+      background:#c62828; color:#fff; font-weight:bold; cursor:pointer;
     }
-    button.secondary {
-      background: #333;
-    }
+    button.secondary { background:#333; }
 
     .status {
-      margin-top: 10px;
-      background: #f7f7f7;
-      border: 1px solid #eee;
-      padding: 10px 12px;
-      border-radius: 10px;
-      font-size: 12px;
-      line-height: 1.35;
-      color: #222;
+      margin-top:10px;
+      background:#f7f7f7;
+      border:1px solid #eee;
+      padding:10px 12px;
+      border-radius:10px;
+      font-size:12px;
+      line-height:1.35;
+      color:#222;
     }
   </style>
 </head>
@@ -126,22 +78,19 @@
 
   <main>
     <p class="info">
-      ✔ Open this link on your phone/tablet<br>
       ✔ Tap <strong>AR</strong><br>
-      ✔ Scan the floor<br>
       ✔ Gestures: <strong>drag</strong> (move), <strong>pinch</strong> (scale), <strong>two fingers</strong> (rotate)<br>
-      ✔ Long models: position using <strong>Compact Mode</strong>, then switch to <strong>Real Scale</strong>
+      ✔ The model will start small — scale up as needed
     </p>
 
     <div class="controls">
-      <button id="compactBtn" class="secondary">Compact Mode: ON</button>
+      <button id="compactBtn" class="secondary">Compact Start: ON</button>
       <button id="realBtn">Real Scale (1:1)</button>
     </div>
 
     <div class="viewer-wrap">
       <div class="crosshair"></div>
 
-      <!-- Use ?v=3, ?v=4, etc. when updating -->
       <model-viewer
         id="viewer"
         src="BBC_Outside_Platform_4.glb"
@@ -160,7 +109,7 @@
     </div>
 
     <div class="status" id="status">
-      Tip: Use <b>Compact Mode</b> to position long models more easily. Then switch to <b>Real Scale</b>.
+      Tip: Start small, place it easily, then pinch to scale up.
     </div>
   </main>
 
@@ -170,47 +119,50 @@
     const realBtn = document.getElementById('realBtn');
     const statusEl = document.getElementById('status');
 
-    // Prevent browser from interfering with gestures INSIDE the viewer only
     viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-    // --- Compact Mode (improves positioning for long models) ---
-    // Default compact value is safe; we'll try to auto-adjust based on model size when possible.
-    const TARGET_MAX_DIM_METERS = 1.2; // “comfortable” size while positioning
+    // --- Compact scale logic (universal) ---
+    // Smaller target = starts smaller in AR.
+    // If you want it EVEN smaller at start, change TARGET_MAX_DIM_METERS to 0.7 or 0.5
+    const TARGET_MAX_DIM_METERS = 0.8;
+
     const COMPACT_MIN = 0.03;
     const COMPACT_MAX = 1.0;
 
+    // Fallback start scale (if we can't read model dimensions)
+    const FALLBACK_COMPACT = 0.15;
+
     let compactOn = true;
-    let compactScale = 0.22; // fallback
+    let compactScale = FALLBACK_COMPACT;
 
     function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function setScaleUniform(s) { viewer.setAttribute('scale', `${s} ${s} ${s}`); }
 
-    function setScaleUniform(s) {
-      viewer.setAttribute('scale', `${s} ${s} ${s}`);
+    function applyCompactNow() {
+      setScaleUniform(compactScale);
     }
 
     function setCompact(on) {
       compactOn = on;
-
       if (on) {
-        setScaleUniform(compactScale);
-        compactBtn.textContent = 'Compact Mode: ON';
+        applyCompactNow();
+        compactBtn.textContent = 'Compact Start: ON';
         compactBtn.classList.add('secondary');
-        statusEl.innerHTML = `Compact Mode ON — scale: <b>${compactScale.toFixed(3)}x</b>. Place the model, then tap <b>Real Scale</b>.`;
+        statusEl.innerHTML = `Compact start ON — initial scale: <b>${compactScale.toFixed(3)}x</b>. Pinch to scale up.`;
       } else {
         setScaleUniform(1.0);
-        compactBtn.textContent = 'Compact Mode: OFF';
+        compactBtn.textContent = 'Compact Start: OFF';
         compactBtn.classList.remove('secondary');
-        statusEl.innerHTML = 'Real Scale ON (1:1). Use pinch/drag/two-finger rotate for fine adjustment.';
+        statusEl.innerHTML = 'Real scale (1:1). Pinch to fine-tune.';
       }
     }
 
     compactBtn.addEventListener('click', () => setCompact(!compactOn));
     realBtn.addEventListener('click', () => setCompact(false));
 
-    // Try to compute a good compact scale for ANY model using its dimensions (if available)
     function computeCompactScale() {
       try {
-        const d = viewer.getDimensions?.(); // {x,y,z} in meters
+        const d = viewer.getDimensions?.(); // meters
         if (!d) return false;
 
         const maxDim = Math.max(d.x, d.y, d.z);
@@ -220,11 +172,12 @@
 
         statusEl.innerHTML =
           `Model loaded. Approx size: <b>${d.x.toFixed(2)}m</b> × <b>${d.y.toFixed(2)}m</b> × <b>${d.z.toFixed(2)}m</b>. ` +
-          `Compact scale: <b>${compactScale.toFixed(3)}x</b>.`;
+          `Initial compact scale: <b>${compactScale.toFixed(3)}x</b>.`;
 
-        if (compactOn) setScaleUniform(compactScale);
+        if (compactOn) applyCompactNow();
         return true;
-      } catch (e) {
+      } catch {
+        compactScale = FALLBACK_COMPACT;
         return false;
       }
     }
@@ -232,21 +185,28 @@
     viewer.addEventListener('load', () => {
       const ok = computeCompactScale();
       if (!ok) {
-        compactScale = 0.22;
-        if (compactOn) setScaleUniform(compactScale);
-        statusEl.textContent = 'Model loaded. Compact Mode uses default 0.22x (dimensions not available).';
+        compactScale = FALLBACK_COMPACT;
+        if (compactOn) applyCompactNow();
+        statusEl.textContent = `Model loaded. Using fallback compact start: ${compactScale.toFixed(2)}x.`;
       }
     });
 
-    // Optional: small AR status hints
+    // IMPORTANT: when AR session starts, force the compact start scale
     viewer.addEventListener('ar-status', (e) => {
       const s = e.detail.status; // not-presenting | session-started | object-placed | failed
-      if (s === 'session-started') statusEl.textContent = 'AR started. Scan the floor and place the model.';
-      if (s === 'object-placed') statusEl.textContent = 'Placed! Drag=move, pinch=scale, two fingers=rotate.';
-      if (s === 'failed') statusEl.textContent = 'AR failed. Try better lighting and a textured floor.';
+      if (s === 'session-started') {
+        if (compactOn) applyCompactNow();  // start smaller in camera mode
+        statusEl.textContent = 'AR started. The model starts smaller — pinch to scale up.';
+      }
+      if (s === 'object-placed') {
+        statusEl.textContent = 'Placed! Drag=move, pinch=scale, two fingers=rotate.';
+      }
+      if (s === 'failed') {
+        statusEl.textContent = 'AR failed. Try better lighting and a textured floor.';
+      }
     });
 
-    // Start with Compact Mode ON (best default for long/unknown models)
+    // Start with compact ON by default
     setCompact(true);
   </script>
 </body>
