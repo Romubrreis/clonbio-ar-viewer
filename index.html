@@ -1,44 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta charset="UTF-8">
   <title>CLONBIO – Industrial AR Viewer</title>
 
+  <!-- Google Model Viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
-    body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f4f4f4; }
-    header { background:#c62828; color:#fff; padding:16px; font-size:20px; font-weight:700; }
-    main { max-width:1100px; margin:20px auto; background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,.12); }
-
-    .info { margin:0 0 12px; background:#eee; padding:12px; border-radius:10px; font-size:14px; line-height:1.4; }
-
-    .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin: 10px 0 12px; }
-    button { border:0; border-radius:10px; padding:10px 12px; background:#c62828; color:#fff; font-weight:700; cursor:pointer; }
-    button.secondary { background:#333; }
-
-    .wrap { position:relative; }
-    model-viewer {
-      width:100%;
-      height:600px;
-      background:#111;
-      border-radius:12px;
-
-      /* Best touch behavior */
-      touch-action:none;
-      user-select:none;
-      -webkit-user-select:none;
-      -webkit-tap-highlight-color: transparent;
+    /* Reset e estilo geral */
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f4f4f4;
     }
 
-    .status {
-      margin-top:10px;
-      font-size:12px; color:#222;
-      background:#f7f7f7; border:1px solid #eee;
-      padding:10px 12px; border-radius:10px;
-      line-height:1.35;
-      white-space: pre-wrap;
+    header {
+      background-color: #c62828;
+      color: #fff;
+      padding: 16px;
+      font-size: 20px;
+      font-weight: bold;
+      text-align: left;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 20px auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 600px;
+      background-color: #111;
+      border-radius: 12px;
+    }
+
+    .info {
+      margin-top: 15px;
+      background-color: #eee;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -48,130 +55,23 @@
 
   <main>
     <p class="info">
-      ✔ Tap <b>AR</b><br>
-      ✔ Gestures: <b>drag</b> (move), <b>pinch</b> (scale), <b>two fingers</b> (rotate)<br>
-      ✔ Long models: position using <b>Auto Compact</b>, then switch to <b>Real Scale</b>
+      ✔ Abra este link no celular<br>
+      ✔ Toque no botão <strong>AR</strong><br>
+      ✔ Mova o celular para escanear o chão<br>
+      ✔ O modelo aparecerá em escala real no ambiente
     </p>
 
-    <div class="bar">
-      <button id="compactBtn" class="secondary">Auto Compact: ON</button>
-      <button id="realBtn">Real Scale (1:1)</button>
-      <button id="reloadBtn" class="secondary">Reload (cache bust)</button>
-    </div>
-
-    <div class="wrap">
-      <model-viewer
-        id="viewer"
-
-        <!-- CHANGE ONLY THIS -->
-        src="BBC_Outside_Platform_4.glb"
-
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        ar-placement="floor"
-        ar-scale="auto"
-
-        camera-controls
-        interaction-prompt="auto"
-
-        environment-image="neutral"
-        exposure="1.0"
-        shadow-intensity="0.8"
-
-        bounds="tight"
-        loading="eager">
-      </model-viewer>
-    </div>
-
-    <div class="status" id="status">Loading…</div>
+    <!-- Use ?v=3, ?v=4, etc. ao atualizar -->
+    <model-viewer
+      src="BBC_Outside_Platform_4.glb"
+      ar
+      ar-modes="webxr scene-viewer quick-look"
+      ar-scale="auto"
+      camera-controls
+      auto-rotate
+      environment-image="neutral"
+      exposure="1.0">
+    </model-viewer>
   </main>
-
-  <script>
-    const viewer = document.getElementById('viewer');
-    const statusEl = document.getElementById('status');
-    const compactBtn = document.getElementById('compactBtn');
-    const realBtn = document.getElementById('realBtn');
-    const reloadBtn = document.getElementById('reloadBtn');
-
-    // Auto Compact (universal)
-    const TARGET_MAX_DIM_METERS = 1.2;
-    const COMPACT_MIN = 0.03;
-    const COMPACT_MAX = 1.0;
-
-    let compactOn = true;
-    let compactScale = 0.22;
-
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-    const setScaleUniform = (s) => viewer.setAttribute('scale', `${s} ${s} ${s}`);
-
-    function setCompact(on){
-      compactOn = on;
-      if (on){
-        setScaleUniform(compactScale);
-        compactBtn.textContent = 'Auto Compact: ON';
-        compactBtn.classList.add('secondary');
-        statusEl.textContent = `Auto Compact ON — scale: ${compactScale.toFixed(3)}x`;
-      } else {
-        setScaleUniform(1.0);
-        compactBtn.textContent = 'Auto Compact: OFF';
-        compactBtn.classList.remove('secondary');
-        statusEl.textContent = 'Real Scale ON (1:1)';
-      }
-    }
-
-    compactBtn.addEventListener('click', () => setCompact(!compactOn));
-    realBtn.addEventListener('click', () => setCompact(false));
-
-    // Cache-bust reload (useful on GitHub Pages)
-    reloadBtn.addEventListener('click', () => {
-      const base = viewer.src.split('?')[0];
-      viewer.src = `${base}?v=${Date.now()}`;
-      statusEl.textContent = 'Reloading model…';
-    });
-
-    // Only prevent browser interference inside viewer
-    viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive:false });
-
-    function computeCompactScale(){
-      const d = viewer.getDimensions?.();
-      if (!d) return false;
-
-      const maxDim = Math.max(d.x, d.y, d.z);
-      if (!isFinite(maxDim) || maxDim <= 0) return false;
-
-      compactScale = clamp(TARGET_MAX_DIM_METERS / maxDim, COMPACT_MIN, COMPACT_MAX);
-
-      statusEl.textContent =
-        `Loaded. Size ≈ ${d.x.toFixed(2)}m × ${d.y.toFixed(2)}m × ${d.z.toFixed(2)}m\n` +
-        `Auto Compact: ${compactScale.toFixed(3)}x`;
-
-      if (compactOn) setScaleUniform(compactScale);
-      return true;
-    }
-
-    viewer.addEventListener('load', () => {
-      const ok = computeCompactScale();
-      if (!ok) {
-        compactScale = 0.22;
-        if (compactOn) setScaleUniform(compactScale);
-        statusEl.textContent = 'Loaded (dimensions not available). Using Auto Compact 0.22x.';
-      }
-    });
-
-    viewer.addEventListener('error', () => {
-      statusEl.textContent =
-        '❌ Failed to load model.\n' +
-        'Check: exact filename (case-sensitive), correct folder path, and that the .glb is reachable on GitHub Pages.';
-    });
-
-    viewer.addEventListener('ar-status', (e) => {
-      const s = e.detail.status;
-      if (s === 'session-started') statusEl.textContent = 'AR started. Scan the floor and place the model.';
-      if (s === 'object-placed') statusEl.textContent = 'Placed! Drag=move, pinch=scale, two fingers=rotate.';
-      if (s === 'failed') statusEl.textContent = 'AR failed. Try better lighting and a textured surface.';
-    });
-
-    setCompact(true);
-  </script>
 </body>
 </html>
