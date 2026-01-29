@@ -35,6 +35,7 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    /* Crosshair */
     .crosshair {
       position:absolute; top:50%; left:50%;
       transform:translate(-50%,-50%);
@@ -43,7 +44,7 @@
       border-radius:50%;
       pointer-events:none;
       z-index:3;
-      box-shadow:0 0 0 2px rgba(0,0,0,.25);
+      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
     }
     .crosshair::before,.crosshair::after{
       content:""; position:absolute; top:50%; left:50%;
@@ -53,12 +54,14 @@
     .crosshair::before{ width:10px; height:2px; }
     .crosshair::after{ width:2px; height:10px; }
 
+    /* Controls */
     .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0 0; }
     button {
       border:none; border-radius:10px; padding:10px 12px;
       background:#c62828; color:#fff; font-weight:bold; cursor:pointer;
     }
     button.secondary { background:#333; }
+    button.ghost { background: rgba(0,0,0,.12); color:#111; }
 
     .status {
       margin-top:10px;
@@ -69,6 +72,34 @@
       font-size:12px;
       line-height:1.35;
       color:#222;
+      white-space: pre-wrap;
+    }
+
+    /* BIG scale badge */
+    .scale-badge {
+      position:absolute;
+      top:12px;
+      left:12px;
+      z-index:5;
+      background: rgba(0,0,0,.55);
+      color:#fff;
+      padding:10px 12px;
+      border-radius:12px;
+      backdrop-filter: blur(6px);
+      pointer-events:none;
+      min-width: 160px;
+    }
+    .scale-badge .label { font-size:12px; opacity:.85; }
+    .scale-badge .value { font-size:24px; font-weight:800; line-height:1.05; }
+    .scale-badge .sub { font-size:12px; opacity:.9; margin-top:2px; }
+    .scale-badge .oneone {
+      display:inline-block;
+      margin-top:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      background: rgba(255,255,255,.18);
+      font-size:12px;
+      font-weight:800;
     }
   </style>
 </head>
@@ -80,16 +111,29 @@
     <p class="info">
       ✔ Tap <strong>AR</strong><br>
       ✔ Gestures: <strong>drag</strong> (move), <strong>pinch</strong> (scale), <strong>two fingers</strong> (rotate)<br>
-      ✔ The model will start small — scale up as needed
+      ✔ Tip: Start small, place it easily, then scale up.
     </p>
 
     <div class="controls">
       <button id="compactBtn" class="secondary">Compact Start: ON</button>
       <button id="realBtn">Real Scale (1:1)</button>
+
+      <button id="scaleDownBtn" class="ghost">– Scale</button>
+      <button id="scaleUpBtn" class="ghost">+ Scale</button>
+
+      <button id="photoBtn" class="secondary">Photo</button>
+      <button id="recBtn" class="secondary">Record</button>
     </div>
 
     <div class="viewer-wrap">
       <div class="crosshair"></div>
+
+      <div class="scale-badge" id="scaleBadge">
+        <div class="label">Scale</div>
+        <div class="value" id="scaleText">--</div>
+        <div class="sub" id="scaleSub">--</div>
+        <div class="oneone" id="oneOne" style="display:none;">1:1</div>
+      </div>
 
       <model-viewer
         id="viewer"
@@ -109,34 +153,66 @@
     </div>
 
     <div class="status" id="status">
-      Tip: Start small, place it easily, then pinch to scale up.
+      Tip: Compact Start ON makes long models easier to place. Then switch to Real Scale.
     </div>
   </main>
 
   <script>
     const viewer = document.getElementById('viewer');
+
     const compactBtn = document.getElementById('compactBtn');
     const realBtn = document.getElementById('realBtn');
-    const statusEl = document.getElementById('status');
+    const scaleDownBtn = document.getElementById('scaleDownBtn');
+    const scaleUpBtn = document.getElementById('scaleUpBtn');
 
+    const photoBtn = document.getElementById('photoBtn');
+    const recBtn = document.getElementById('recBtn');
+
+    const statusEl = document.getElementById('status');
+    const scaleText = document.getElementById('scaleText');
+    const scaleSub = document.getElementById('scaleSub');
+    const oneOne = document.getElementById('oneOne');
+
+    // Prevent browser interference ONLY inside viewer
     viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-    // --- Compact scale logic (universal) ---
-    // Smaller target = starts smaller in AR.
-    // If you want it EVEN smaller at start, change TARGET_MAX_DIM_METERS to 0.7 or 0.5
+    // ---------- SCALE LOGIC ----------
+    // Smaller target => starts smaller in AR.
     const TARGET_MAX_DIM_METERS = 0.8;
-
     const COMPACT_MIN = 0.03;
     const COMPACT_MAX = 1.0;
 
-    // Fallback start scale (if we can't read model dimensions)
+    // Fallback start scale (if dimensions cannot be read)
     const FALLBACK_COMPACT = 0.15;
+
+    // Micro-adjust buttons step
+    const SCALE_STEP = 0.02; // 2% per click
+    const SCALE_MIN = 0.02;
+    const SCALE_MAX = 3.00;
 
     let compactOn = true;
     let compactScale = FALLBACK_COMPACT;
 
+    // This is the base scale we apply via attribute "scale"
+    // (Gestures in AR may apply additional scaling internally depending on AR mode.)
+    let baseScale = compactScale;
+
     function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-    function setScaleUniform(s) { viewer.setAttribute('scale', `${s} ${s} ${s}`); }
+
+    function setScaleUniform(s) {
+      baseScale = clamp(s, SCALE_MIN, SCALE_MAX);
+      viewer.setAttribute('scale', `${baseScale} ${baseScale} ${baseScale}`);
+      updateScaleUI();
+    }
+
+    function updateScaleUI() {
+      // Show as x and percent
+      scaleText.textContent = `${baseScale.toFixed(2)}x`;
+      scaleSub.textContent = `${Math.round(baseScale * 100)}%`;
+      // Treat ~1.00 as 1:1 (tolerance)
+      const isOneOne = Math.abs(baseScale - 1.0) <= 0.02;
+      oneOne.style.display = isOneOne ? 'inline-block' : 'none';
+    }
 
     function applyCompactNow() {
       setScaleUniform(compactScale);
@@ -148,17 +224,27 @@
         applyCompactNow();
         compactBtn.textContent = 'Compact Start: ON';
         compactBtn.classList.add('secondary');
-        statusEl.innerHTML = `Compact start ON — initial scale: <b>${compactScale.toFixed(3)}x</b>. Pinch to scale up.`;
+        statusEl.textContent = `Compact start ON — initial scale: ${baseScale.toFixed(2)}x. Pinch to scale up.`;
       } else {
         setScaleUniform(1.0);
         compactBtn.textContent = 'Compact Start: OFF';
         compactBtn.classList.remove('secondary');
-        statusEl.innerHTML = 'Real scale (1:1). Pinch to fine-tune.';
+        statusEl.textContent = 'Real scale (1:1) applied. Use pinch/drag/two-finger rotate.';
       }
     }
 
     compactBtn.addEventListener('click', () => setCompact(!compactOn));
     realBtn.addEventListener('click', () => setCompact(false));
+
+    scaleDownBtn.addEventListener('click', () => {
+      setScaleUniform(baseScale - SCALE_STEP);
+      statusEl.textContent = `Scale adjusted: ${baseScale.toFixed(2)}x`;
+    });
+
+    scaleUpBtn.addEventListener('click', () => {
+      setScaleUniform(baseScale + SCALE_STEP);
+      statusEl.textContent = `Scale adjusted: ${baseScale.toFixed(2)}x`;
+    });
 
     function computeCompactScale() {
       try {
@@ -170,9 +256,9 @@
 
         compactScale = clamp(TARGET_MAX_DIM_METERS / maxDim, COMPACT_MIN, COMPACT_MAX);
 
-        statusEl.innerHTML =
-          `Model loaded. Approx size: <b>${d.x.toFixed(2)}m</b> × <b>${d.y.toFixed(2)}m</b> × <b>${d.z.toFixed(2)}m</b>. ` +
-          `Initial compact scale: <b>${compactScale.toFixed(3)}x</b>.`;
+        statusEl.textContent =
+          `Model loaded. Size ≈ ${d.x.toFixed(2)}m × ${d.y.toFixed(2)}m × ${d.z.toFixed(2)}m. ` +
+          `Compact start: ${compactScale.toFixed(2)}x`;
 
         if (compactOn) applyCompactNow();
         return true;
@@ -187,16 +273,17 @@
       if (!ok) {
         compactScale = FALLBACK_COMPACT;
         if (compactOn) applyCompactNow();
-        statusEl.textContent = `Model loaded. Using fallback compact start: ${compactScale.toFixed(2)}x.`;
+        statusEl.textContent = `Model loaded. Using fallback compact start: ${compactScale.toFixed(2)}x`;
       }
+      updateScaleUI();
     });
 
-    // IMPORTANT: when AR session starts, force the compact start scale
+    // Force compact scale when AR session starts
     viewer.addEventListener('ar-status', (e) => {
       const s = e.detail.status; // not-presenting | session-started | object-placed | failed
       if (s === 'session-started') {
-        if (compactOn) applyCompactNow();  // start smaller in camera mode
-        statusEl.textContent = 'AR started. The model starts smaller — pinch to scale up.';
+        if (compactOn) applyCompactNow();
+        statusEl.textContent = `AR started. Initial scale: ${baseScale.toFixed(2)}x (pinch to scale).`;
       }
       if (s === 'object-placed') {
         statusEl.textContent = 'Placed! Drag=move, pinch=scale, two fingers=rotate.';
@@ -206,8 +293,85 @@
       }
     });
 
-    // Start with compact ON by default
+    // ---------- PHOTO (SNAPSHOT) ----------
+    // Best-effort: captures the model-viewer canvas. In AR, many devices will NOT include the real camera background.
+    function downloadBlob(blob, filename) {
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    photoBtn.addEventListener('click', async () => {
+      try {
+        // toDataURL() is supported; it captures the WebGL canvas (may not include camera feed in AR).
+        const dataUrl = await viewer.toDataURL('image/png');
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        downloadBlob(blob, `clonbio_snapshot_${Date.now()}.png`);
+        statusEl.textContent = 'Snapshot saved (note: AR background may not be captured on some devices).';
+      } catch (err) {
+        statusEl.textContent = 'Snapshot not supported on this device/browser. Use device screenshot instead.';
+      }
+    });
+
+    // ---------- VIDEO (BEST-EFFORT) ----------
+    // Records the canvas stream (model render). In AR it may NOT include camera background.
+    // iOS Safari often does not support captureStream/MediaRecorder reliably.
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    recBtn.addEventListener('click', async () => {
+      try {
+        const canvas = viewer?.shadowRoot?.querySelector('canvas');
+        if (!canvas || !canvas.captureStream) {
+          statusEl.textContent = 'Recording not supported here. Use device Screen Recording instead.';
+          return;
+        }
+        if (typeof MediaRecorder === 'undefined') {
+          statusEl.textContent = 'MediaRecorder not available. Use device Screen Recording instead.';
+          return;
+        }
+
+        // Toggle start/stop
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+          recBtn.textContent = 'Record';
+          recBtn.classList.add('secondary');
+          statusEl.textContent = 'Stopping recording...';
+          return;
+        }
+
+        recordedChunks = [];
+        const stream = canvas.captureStream(30);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          downloadBlob(blob, `clonbio_record_${Date.now()}.webm`);
+          statusEl.textContent = 'Video saved (note: AR camera background may not be captured).';
+        };
+
+        mediaRecorder.start();
+        recBtn.textContent = 'Stop';
+        recBtn.classList.remove('secondary');
+        statusEl.textContent = 'Recording started...';
+      } catch (err) {
+        statusEl.textContent = 'Recording failed on this browser. Use device Screen Recording instead.';
+      }
+    });
+
+    // Init
     setCompact(true);
+    updateScaleUI();
   </script>
 </body>
 </html>
