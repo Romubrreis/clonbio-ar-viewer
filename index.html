@@ -8,84 +8,70 @@
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
-    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; }
-
-    header {
-      background-color: #c62828;
-      color: #fff;
-      padding: 16px;
-      font-size: 20px;
-      font-weight: bold;
-      text-align: left;
-    }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background-color:#f4f4f4; }
+    header { background-color:#c62828; color:#fff; padding:16px; font-size:20px; font-weight:bold; text-align:left; }
 
     main {
-      max-width: 1100px;
-      margin: 20px auto;
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+      max-width:1100px; margin:20px auto; background-color:#fff; padding:20px;
+      border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,0.12);
     }
 
     .info {
-      margin-top: 15px;
-      background-color: #eee;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      line-height: 1.4;
+      margin-top:15px; background-color:#eee; padding:12px;
+      border-radius:8px; font-size:14px; line-height:1.4;
     }
 
-    .viewer-wrap { position: relative; }
+    .viewer-wrap { position:relative; }
 
     model-viewer {
-      width: 100%;
-      height: 600px;
-      background-color: #111;
-      border-radius: 12px;
+      width:100%;
+      height:600px;
+      background-color:#111;
+      border-radius:12px;
 
-      /* improves gestures in AR */
-      touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
+      touch-action:none;
+      -webkit-user-select:none;
+      user-select:none;
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* BIG overlay visible ON TOP of AR (only works in WebXR in-browser) */
-    .ar-hud {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 10;
-      background: rgba(0,0,0,.55);
-      color: #fff;
-      padding: 12px 14px;
-      border-radius: 14px;
-      backdrop-filter: blur(6px);
-      pointer-events: none;
-      min-width: 220px;
-      display: none; /* shown only while presenting AR in-browser */
+    .crosshair {
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:18px; height:18px;
+      border:2px solid rgba(255,255,255,.75);
+      border-radius:50%;
+      pointer-events:none;
+      z-index:3;
+      box-shadow:0 0 0 2px rgba(0,0,0,.25);
     }
-    .ar-hud .title { font-size: 12px; opacity: .85; }
-    .ar-hud .scale {
-      font-size: 34px;
-      font-weight: 900;
-      line-height: 1.0;
-      margin-top: 2px;
+    .crosshair::before,.crosshair::after{
+      content:""; position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      background: rgba(255,255,255,.75);
     }
-    .ar-hud .sub { font-size: 14px; opacity: .95; margin-top: 4px; }
-    .ar-hud .tag {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.18);
-      font-size: 14px;
-      font-weight: 900;
+    .crosshair::before{ width:10px; height:2px; }
+    .crosshair::after{ width:2px; height:10px; }
+
+    .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0 0; }
+    button {
+      border:none; border-radius:10px; padding:10px 12px;
+      background:#c62828; color:#fff; font-weight:bold; cursor:pointer;
+    }
+    button.secondary { background:#333; }
+
+    .status {
+      margin-top:10px;
+      background:#f7f7f7;
+      border:1px solid #eee;
+      padding:10px 12px;
+      border-radius:10px;
+      font-size:12px;
+      line-height:1.35;
+      color:#222;
     }
 
-    /* Photo button overlay (only in WebXR in-browser) */
+    /* ===== PHOTO BUTTON (visible only during in-browser AR / WebXR) ===== */
     .photo-btn {
       position: absolute;
       right: 12px;
@@ -98,7 +84,7 @@
       color: #fff;
       font-weight: 900;
       cursor: pointer;
-      display: none; /* shown only while presenting AR in-browser */
+      display: none; /* shown when AR is presenting in-browser */
     }
   </style>
 </head>
@@ -108,21 +94,20 @@
 
   <main>
     <p class="info">
-      ✔ Open on your phone/tablet<br>
-      ✔ Tap <b>AR</b><br>
-      ✔ Gestures: <b>drag</b> move, <b>pinch</b> scale, <b>two fingers</b> rotate<br>
-      ✔ NOTE: The big scale HUD + Photo button only appear when AR runs <b>inside the browser (WebXR)</b>.
+      ✔ Tap <strong>AR</strong><br>
+      ✔ Gestures: <strong>drag</strong> (move), <strong>pinch</strong> (scale), <strong>two fingers</strong> (rotate)<br>
+      ✔ The model will start small — scale up as needed
     </p>
 
-    <div class="viewer-wrap">
-      <!-- HUD shown only in WebXR AR -->
-      <div class="ar-hud" id="hud">
-        <div class="title">Scale (AR)</div>
-        <div class="scale" id="hudScale">--</div>
-        <div class="sub" id="hudPct">--</div>
-        <div class="tag" id="hudOneOne" style="display:none;">1:1</div>
-      </div>
+    <div class="controls">
+      <button id="compactBtn" class="secondary">Compact Start: ON</button>
+      <button id="realBtn">Real Scale (1:1)</button>
+    </div>
 
+    <div class="viewer-wrap">
+      <div class="crosshair"></div>
+
+      <!-- Photo button overlay (only appears during in-browser AR / WebXR) -->
       <button class="photo-btn" id="photoBtn">PHOTO</button>
 
       <model-viewer
@@ -135,63 +120,120 @@
         camera-controls
         environment-image="neutral"
         exposure="1.0"
+        shadow-intensity="0.8"
         bounds="tight"
         loading="eager"
         interaction-prompt="auto">
       </model-viewer>
     </div>
+
+    <div class="status" id="status">
+      Tip: Start small, place it easily, then pinch to scale up.
+    </div>
   </main>
 
   <script>
     const viewer = document.getElementById('viewer');
-    const hud = document.getElementById('hud');
-    const hudScale = document.getElementById('hudScale');
-    const hudPct = document.getElementById('hudPct');
-    const hudOneOne = document.getElementById('hudOneOne');
+    const compactBtn = document.getElementById('compactBtn');
+    const realBtn = document.getElementById('realBtn');
+    const statusEl = document.getElementById('status');
     const photoBtn = document.getElementById('photoBtn');
 
-    // Improve gestures (only within viewer)
     viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-    // We track the "base scale" we apply. (Pinch in AR may change it internally depending on mode.)
-    let baseScale = 1.0;
+    // --- Compact scale logic (universal) ---
+    const TARGET_MAX_DIM_METERS = 0.8;
+    const COMPACT_MIN = 0.03;
+    const COMPACT_MAX = 1.0;
 
-    function updateHud() {
-      hudScale.textContent = `${baseScale.toFixed(2)}x`;
-      hudPct.textContent = `${Math.round(baseScale * 100)}%`;
-      const isOneOne = Math.abs(baseScale - 1.0) <= 0.02;
-      hudOneOne.style.display = isOneOne ? 'inline-block' : 'none';
+    const FALLBACK_COMPACT = 0.15;
+
+    let compactOn = true;
+    let compactScale = FALLBACK_COMPACT;
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function setScaleUniform(s) { viewer.setAttribute('scale', `${s} ${s} ${s}`); }
+
+    function applyCompactNow() {
+      setScaleUniform(compactScale);
     }
 
-    function setScaleUniform(s) {
-      baseScale = s;
-      viewer.setAttribute('scale', `${s} ${s} ${s}`);
-      updateHud();
+    function setCompact(on) {
+      compactOn = on;
+      if (on) {
+        applyCompactNow();
+        compactBtn.textContent = 'Compact Start: ON';
+        compactBtn.classList.add('secondary');
+        statusEl.innerHTML = `Compact start ON — initial scale: <b>${compactScale.toFixed(3)}x</b>. Pinch to scale up.`;
+      } else {
+        setScaleUniform(1.0);
+        compactBtn.textContent = 'Compact Start: OFF';
+        compactBtn.classList.remove('secondary');
+        statusEl.innerHTML = 'Real scale (1:1). Pinch to fine-tune.';
+      }
     }
 
-    // Start smaller when AR starts (you can change this default)
-    const START_SMALL = 0.20;
+    compactBtn.addEventListener('click', () => setCompact(!compactOn));
+    realBtn.addEventListener('click', () => setCompact(false));
 
+    function computeCompactScale() {
+      try {
+        const d = viewer.getDimensions?.(); // meters
+        if (!d) return false;
+
+        const maxDim = Math.max(d.x, d.y, d.z);
+        if (!isFinite(maxDim) || maxDim <= 0) return false;
+
+        compactScale = clamp(TARGET_MAX_DIM_METERS / maxDim, COMPACT_MIN, COMPACT_MAX);
+
+        statusEl.innerHTML =
+          `Model loaded. Approx size: <b>${d.x.toFixed(2)}m</b> × <b>${d.y.toFixed(2)}m</b> × <b>${d.z.toFixed(2)}m</b>. ` +
+          `Initial compact scale: <b>${compactScale.toFixed(3)}x</b>.`;
+
+        if (compactOn) applyCompactNow();
+        return true;
+      } catch {
+        compactScale = FALLBACK_COMPACT;
+        return false;
+      }
+    }
+
+    viewer.addEventListener('load', () => {
+      const ok = computeCompactScale();
+      if (!ok) {
+        compactScale = FALLBACK_COMPACT;
+        if (compactOn) applyCompactNow();
+        statusEl.textContent = `Model loaded. Using fallback compact start: ${compactScale.toFixed(2)}x.`;
+      }
+    });
+
+    // IMPORTANT: when AR session starts, force the compact start scale
+    // Also: show/hide PHOTO button only while presenting in-browser AR (WebXR)
     viewer.addEventListener('ar-status', (e) => {
-      const s = e.detail.status;
+      const s = e.detail.status; // not-presenting | session-started | object-placed | failed
 
       if (s === 'session-started') {
-        // If it is WebXR in-browser, show HUD + photo button
-        // (In Scene Viewer / Quick Look these won't show because you're leaving the page)
-        hud.style.display = 'block';
+        if (compactOn) applyCompactNow();
+        statusEl.textContent = 'AR started. The model starts smaller — pinch to scale up.';
         photoBtn.style.display = 'block';
+      }
 
-        // Start smaller
-        setScaleUniform(START_SMALL);
+      if (s === 'object-placed') {
+        statusEl.textContent = 'Placed! Drag=move, pinch=scale, two fingers=rotate.';
+      }
+
+      if (s === 'failed') {
+        statusEl.textContent = 'AR failed. Try better lighting and a textured floor.';
+        photoBtn.style.display = 'none';
       }
 
       if (s === 'not-presenting') {
-        hud.style.display = 'none';
         photoBtn.style.display = 'none';
       }
     });
 
-    // Photo (best-effort): captures the viewer canvas
+    // ===== PHOTO (best-effort inside WebXR) =====
+    // Note: Depending on device/browser, this may capture only the model render (not the camera background).
     function downloadBlob(blob, filename) {
       const a = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -214,8 +256,8 @@
       }
     });
 
-    // Init HUD values
-    setScaleUniform(1.0);
+    // Start with compact ON by default
+    setCompact(true);
   </script>
 </body>
 </html>
