@@ -1,52 +1,56 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>CLONBIO – Industrial AR Viewer</title>
 
+  <!-- model-viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
     body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f4f4f4; }
     header { background:#c62828; color:#fff; padding:16px; font-size:20px; font-weight:700; }
 
-    main {
+    main{
       max-width:1100px; margin:20px auto; background:#fff; padding:20px;
       border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,.12);
     }
 
-    .info {
+    .info{
       margin:0 0 12px;
       background:#eee; padding:12px; border-radius:10px;
       font-size:14px; line-height:1.4;
     }
 
-    .bar {
+    .bar{
       display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-      margin: 10px 0 12px;
+      margin:10px 0 12px;
     }
 
-    button {
+    button{
       border:0; border-radius:10px; padding:10px 12px;
       background:#c62828; color:#fff; font-weight:700; cursor:pointer;
     }
-    button.secondary { background:#333; }
+    button.secondary{ background:#333; }
 
-    .wrap { position:relative; }
+    .wrap{ position:relative; }
 
-    model-viewer {
+    model-viewer{
       width:100%;
       height:600px;
       background:#111;
       border-radius:12px;
 
-      /* O mais importante para gestos bons */
-      touch-action: none;
+      /* Critical for better touch gestures */
+      touch-action:none;
       user-select:none;
       -webkit-user-select:none;
+      -webkit-tap-highlight-color: transparent;
     }
 
+    /* Simple crosshair for aiming */
     .crosshair{
       position:absolute; top:50%; left:50%;
       transform:translate(-50%,-50%);
@@ -54,7 +58,7 @@
       border:2px solid rgba(255,255,255,.75);
       border-radius:50%;
       pointer-events:none;
-      z-index: 3;
+      z-index:3;
       box-shadow:0 0 0 2px rgba(0,0,0,.25);
     }
     .crosshair::before,.crosshair::after{
@@ -65,15 +69,14 @@
     .crosshair::before{ width:10px; height:2px; }
     .crosshair::after{ width:2px; height:10px; }
 
-    .status {
+    .status{
       margin-top:10px;
-      font-size:12px; color:#333;
+      font-size:12px; color:#222;
       background:#f7f7f7; border:1px solid #eee;
       padding:10px 12px; border-radius:10px;
       line-height:1.35;
     }
-
-    code { background:#eee; padding:1px 6px; border-radius:6px; }
+    code{ background:#eee; padding:1px 6px; border-radius:6px; }
   </style>
 </head>
 
@@ -82,14 +85,15 @@
 
   <main>
     <p class="info">
-      ✔ Toque em <b>AR</b><br>
-      ✔ Gestos: <b>arrastar</b> (mover), <b>pinça</b> (escala), <b>2 dedos</b> (girar)<br>
-      ✔ Modelos longos: posicione com <b>Modo compacto</b> e depois volte para <b>Escala real</b>
+      ✔ Open this link on your phone/tablet<br>
+      ✔ Tap <b>AR</b><br>
+      ✔ Gestures: <b>drag</b> (move), <b>pinch</b> (scale), <b>two fingers</b> (rotate)<br>
+      ✔ Long models: position using <b>Auto Compact Mode</b>, then switch to <b>Real Scale</b>
     </p>
 
     <div class="bar">
-      <button id="compactBtn" class="secondary">Modo compacto: ON (auto)</button>
-      <button id="realBtn">Escala real</button>
+      <button id="compactBtn" class="secondary">Auto Compact: ON</button>
+      <button id="realBtn">Real Scale (1:1)</button>
     </div>
 
     <div class="wrap">
@@ -98,7 +102,7 @@
       <model-viewer
         id="viewer"
 
-        <!-- TROQUE APENAS AQUI O NOME DO MODELO -->
+        <!-- CHANGE ONLY THIS FILE NAME -->
         src="BBC_Outside_Platform_4.glb"
 
         ar
@@ -119,7 +123,7 @@
     </div>
 
     <div class="status" id="status">
-      Carregue a página e toque em <b>AR</b>. Dica: posicione primeiro com <b>Modo compacto</b>.
+      Loading model...
     </div>
   </main>
 
@@ -129,52 +133,47 @@
     const compactBtn = document.getElementById('compactBtn');
     const realBtn = document.getElementById('realBtn');
 
-    // Bloqueia zoom/gestos do navegador que atrapalham manipular com os dedos
-    ['gesturestart','gesturechange','gestureend'].forEach(evt => {
-      document.addEventListener(evt, e => e.preventDefault(), { passive:false });
-    });
-
-    // Evita scroll da página enquanto o dedo está no viewer
-    viewer.addEventListener('touchmove', e => e.preventDefault(), { passive:false });
-
-    // ===== MODO COMPACTO AUTO (para qualquer modelo) =====
-    // Alvo: deixar o maior lado do modelo ~1.2m no modo compacto (fica fácil de mover/encaixar).
+    // --- Auto Compact settings (universal) ---
+    // Goal: make the largest dimension ~1.2m while positioning (easier for long models).
     const TARGET_MAX_DIM_METERS = 1.2;
-
-    // limites do compacto
     const COMPACT_MIN = 0.03; // 3%
-    const COMPACT_MAX = 1.00; // até 1:1
+    const COMPACT_MAX = 1.00; // up to 1:1
 
     let compactOn = true;
-    let compactScale = 0.22; // fallback inicial
-    let realScale = 1.0;
+    let compactScale = 0.22; // fallback if dimensions cannot be read
 
-    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
 
-    function setScaleUniform(s) {
+    function setScaleUniform(s){
       viewer.setAttribute('scale', `${s} ${s} ${s}`);
     }
 
-    function setCompact(on) {
+    function setCompact(on){
       compactOn = on;
-      if (on) {
+      if (on){
         setScaleUniform(compactScale);
-        compactBtn.textContent = 'Modo compacto: ON (auto)';
+        compactBtn.textContent = 'Auto Compact: ON';
         compactBtn.classList.add('secondary');
-        statusEl.innerHTML = `Modo compacto ativo. Escala compacta: <b>${compactScale.toFixed(3)}x</b>. Posicione e depois clique em <b>Escala real</b>.`;
+        statusEl.innerHTML =
+          `Auto Compact ON — scale: <b>${compactScale.toFixed(3)}x</b>. Place the model, then tap <b>Real Scale</b>.`;
       } else {
-        setScaleUniform(realScale);
-        compactBtn.textContent = 'Modo compacto: OFF';
+        setScaleUniform(1.0);
+        compactBtn.textContent = 'Auto Compact: OFF';
         compactBtn.classList.remove('secondary');
-        statusEl.innerHTML = 'Escala real ativa (1:1). Use pinça para microajustes.';
+        statusEl.innerHTML =
+          'Real Scale ON (1:1). Use pinch/drag/two-finger rotate for fine adjustments.';
       }
     }
 
     compactBtn.addEventListener('click', () => setCompact(!compactOn));
     realBtn.addEventListener('click', () => setCompact(false));
 
-    function computeCompactScale() {
-      try {
+    // IMPORTANT: do NOT block touch on the whole document (it can break taps).
+    // We only stop the browser from interfering inside the viewer.
+    viewer.addEventListener('touchmove', (e) => e.preventDefault(), { passive:false });
+
+    function computeCompactScale(){
+      try{
         const d = viewer.getDimensions?.();
         if (!d) return false;
 
@@ -185,42 +184,48 @@
         compactScale = clamp(raw, COMPACT_MIN, COMPACT_MAX);
 
         statusEl.innerHTML =
-          `Modelo carregado. Dimensões aprox.: <code>${d.x.toFixed(2)}m</code> × <code>${d.y.toFixed(2)}m</code> × <code>${d.z.toFixed(2)}m</code>. ` +
-          `Modo compacto auto: <b>${compactScale.toFixed(3)}x</b>.`;
+          `Model loaded. Size ≈ <code>${d.x.toFixed(2)}m</code> × <code>${d.y.toFixed(2)}m</code> × <code>${d.z.toFixed(2)}m</code>. ` +
+          `Auto Compact = <b>${compactScale.toFixed(3)}x</b>.`;
 
         if (compactOn) setScaleUniform(compactScale);
         return true;
-      } catch (e) {
+      } catch (err){
         return false;
       }
     }
 
-    // Quando o modelo carregar, calcula compacto automaticamente
+    // --- Events / diagnostics ---
     viewer.addEventListener('load', () => {
       const ok = computeCompactScale();
-      if (!ok) {
+      if (!ok){
         compactScale = 0.22;
         if (compactOn) setScaleUniform(compactScale);
-        statusEl.textContent = 'Modelo carregado. (Não consegui ler dimensões; usando compacto padrão 0.22x).';
+        statusEl.textContent =
+          'Model loaded, but dimensions could not be read. Using default Auto Compact (0.22x).';
       }
     });
 
-    // Dicas de status do AR
+    viewer.addEventListener('error', () => {
+      statusEl.innerHTML =
+        '❌ Model failed to load. Check: (1) file name in <code>src</code>, (2) file exists in GitHub Pages, (3) correct path/case.';
+    });
+
     viewer.addEventListener('ar-status', (e) => {
       const s = e.detail.status; // not-presenting | session-started | object-placed | failed
-      if (s === 'session-started') {
-        statusEl.innerHTML = 'AR iniciado. Aponte para o chão e posicione com <b>Modo compacto</b>.';
+      if (s === 'session-started'){
+        statusEl.innerHTML = 'AR started. Aim at the floor and place the model (use <b>Auto Compact</b> first).';
       }
-      if (s === 'object-placed') {
-        statusEl.innerHTML = 'Objeto colocado. Gestos: <b>arrastar</b> move, <b>pinça</b> escala, <b>2 dedos</b> gira.';
+      if (s === 'object-placed'){
+        statusEl.innerHTML = 'Placed! Gestures: <b>drag</b>=move, <b>pinch</b>=scale, <b>two fingers</b>=rotate.';
       }
-      if (s === 'failed') {
-        statusEl.innerHTML = 'Falha no AR. Tente boa luz e chão com textura (evite piso muito liso/reflexivo).';
+      if (s === 'failed'){
+        statusEl.innerHTML = '❌ AR failed. Try better lighting and a textured surface (avoid shiny floors).';
       }
     });
 
-    // Inicia em modo compacto (auto)
+    // Init
     setCompact(true);
+    statusEl.textContent = 'Loading model...';
   </script>
 </body>
 </html>
